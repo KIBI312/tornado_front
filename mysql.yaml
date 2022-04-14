@@ -1,0 +1,71 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wp1-db-secret
+type: Opaque
+data:
+  MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql1-volume
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: mysql1
+  labels:
+    app: mysql1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql1
+  template:
+    metadata:
+      labels:
+        app: mysql1
+    spec:
+      containers:
+        - name: database1
+          image: mysql:5.7
+          args:
+            - "--ignore-db-dir=lost+found"
+          envFrom:
+            - secretRef:
+                name: wp1-db-secret
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql1-data
+              mountPath: /var/lib/mysql
+          env:
+            - name: MYSQL_DATABASE
+              value: mysql
+            - name: MYSQL_USER
+              value: mysql
+            - name: MYSQL_PASSWORD
+              value: ${MYSQL_DB_PASSWORD}  
+      volumes:
+        - name: mysql1-data
+          persistentVolumeClaim:
+            claimName: mysql1-volume
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql1-service
+spec:
+  ports:
+    - port: 3306
+      protocol: TCP
+  selector:
+    app: mysql1
